@@ -1,0 +1,22 @@
+# Web framework
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.32,<0.33
+pydantic>=2.9,<3.0
+pydantic-settings>=2.6,<3.0
+
+# DB / ORM
+sqlalchemy>=2.0,<2.1
+alembic>=1.13,<1.14
+psycopg[binary]>=3.2,<3.3
+
+# Testing
+pytest>=8.3,<8.4
+pytest-asyncio>=0.24,<0.25
+httpx>=0.27,<0.28
+
+# Type/static checks
+mypy>=1.13,<1.14
+ruff>=0.7,<0.8
+
+# HTTP client (RAGFlow API calls)
+requests>=2.32,<2.33
