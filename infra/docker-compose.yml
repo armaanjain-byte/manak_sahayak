@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ms_user
+      POSTGRES_PASSWORD: ms_password
+      POSTGRES_DB: ms_db
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://ms_user:ms_password@db:5432/ms_db
+    depends_on:
+      - db
+
+  ragflow:
+    image: ragflow_placeholder:latest
+    profiles:
+      - rag
