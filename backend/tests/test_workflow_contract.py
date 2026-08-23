@@ -4,7 +4,7 @@ from app.core.states import ResponseState
 from app.core.entities import DecisionObject, Evidence, ClarificationRequest
 
 class DummyWorkflow(Workflow):
-    def run(self, context):
+    async def run(self, context):
         pass
 
 def test_workflow_result_answered_without_decision_raises():
@@ -28,4 +28,30 @@ def test_workflow_result_clarification_with_decision_raises():
             state=ResponseState.CLARIFICATION,
             clarification=ClarificationRequest(question="?"),
             decision=DecisionObject()
+        )
+
+def test_workflow_result_clarification_without_clarification_raises():
+    with pytest.raises(ValueError, match="CLARIFICATION requires a clarification object"):
+        WorkflowResult(
+            state=ResponseState.CLARIFICATION
+        )
+
+def test_workflow_result_conflict_without_evidence_raises():
+    with pytest.raises(ValueError, match="CONFLICT requires conflicting evidence items"):
+        WorkflowResult(
+            state=ResponseState.CONFLICT,
+            evidence=[Evidence(source_id="1", source_type="qco", content="test")]
+        )
+
+def test_workflow_result_not_found_with_decision_raises():
+    with pytest.raises(ValueError, match="NOT_FOUND must not have a decision"):
+        WorkflowResult(
+            state=ResponseState.NOT_FOUND,
+            decision=DecisionObject()
+        )
+
+def test_workflow_result_handoff_without_action_raises():
+    with pytest.raises(ValueError, match="HANDOFF requires an action with a destination URL"):
+        WorkflowResult(
+            state=ResponseState.HANDOFF
         )

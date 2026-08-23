@@ -41,5 +41,5 @@ class WorkflowResult(BaseModel):
 
 class Workflow(ABC):
     @abstractmethod
-    def run(self, context: Any) -> WorkflowResult:
+    async def run(self, context: Any) -> WorkflowResult:
         pass
