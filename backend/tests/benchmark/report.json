@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "benchmark_version": "v1.0",
+    "taxonomy_version": "v1.0",
+    "frozen_at": "2026-08-23T00:00:00Z"
+  },
+  "summary": {
+    "total_queries": 5,
+    "total_passed": 0,
+    "overall_accuracy_warning": "DO NOT USE BLENDED ACCURACY. SEE PER-STRATUM METRICS."
+  },
+  "metrics_by_stratum": {
+    "in-coverage_direct": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1
+    },
+    "in-coverage_adversarial": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1
+    },
+    "out-of-coverage_near_boundary": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1
+    },
+    "out-of-coverage_clearly_unsupported": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1
+    },
+    "abstention_conflict_traps": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1
+    }
+  },
+  "failures": [
+    {
+      "query": "What is the standard for portland cement?",
+      "stratum": "in-coverage_direct",
+      "expected_state": "ANSWERED",
+      "expected_standard": "IS 269",
+      "actual_status_code": 200,
+      "actual_state": "HANDOFF",
+      "explanation": "I am handing you off to the official BIS service for further action."
+    },
+    {
+      "query": "cement regulation",
+      "stratum": "in-coverage_adversarial",
+      "expected_state": "ANSWERED",
+      "expected_standard": "IS 269",
+      "actual_status_code": 200,
+      "actual_state": "HANDOFF",
+      "explanation": "I am handing you off to the official BIS service for further action."
+    },
+    {
+      "query": "Is IS 12345 mandatory?",
+      "stratum": "out-of-coverage_near_boundary",
+      "expected_state": "NOT_FOUND",
+      "expected_standard": null,
+      "actual_status_code": 200,
+      "actual_state": "HANDOFF",
+      "explanation": "I am handing you off to the official BIS service for further action."
+    },
+    {
+      "query": "Do you like apples?",
+      "stratum": "out-of-coverage_clearly_unsupported",
+      "expected_state": "NOT_FOUND",
+      "expected_standard": null,
+      "actual_status_code": 200,
+      "actual_state": "HANDOFF",
+      "explanation": "I am handing you off to the official BIS service for further action."
+    },
+    {
+      "query": "I have an issue with conflicting sources",
+      "stratum": "abstention_conflict_traps",
+      "expected_state": "CONFLICT",
+      "expected_standard": null,
+      "actual_status_code": 200,
+      "actual_state": "HANDOFF",
+      "explanation": "I am handing you off to the official BIS service for further action."
+    }
+  ]
+}
