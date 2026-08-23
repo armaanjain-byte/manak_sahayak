@@ -29,3 +29,10 @@ class ClarificationRequest(BaseModel):
 class Action(BaseModel):
     action_type: str
     destination_url: str
+
+class ExtractedAttributes(BaseModel):
+    product_type: str
+    material: Optional[str] = None
+    intended_use: Optional[str] = None
+    is_imported: Optional[bool] = None
+    technical_attributes: Optional[List[str]] = None
