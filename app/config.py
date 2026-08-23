@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "claude-3-5-sonnet-20241022"
 
+    # CORS — comma-separated list of allowed origins.
+    # Defaults to localhost dev origins; override in production via env.
+    cors_allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
