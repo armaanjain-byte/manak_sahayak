@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, ForeignKey
 from app.db.session import Base
 
 class Standard(Base):
