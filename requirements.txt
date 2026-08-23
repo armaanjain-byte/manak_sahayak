@@ -20,3 +20,5 @@ ruff>=0.7,<0.8
 
 # HTTP client (RAGFlow API calls)
 requests>=2.32,<2.33
+anthropic>=0.30.0
+

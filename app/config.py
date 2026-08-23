@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # Postgres connection — also used by Alembic (alembic.ini reads from env).
     database_url: str = "sqlite:///./test.db"
 
+    # LLM configuration (Phase 10: generation and actions)
+    llm_api_key: str = ""
+    llm_model: str = "claude-3-5-sonnet-20241022"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

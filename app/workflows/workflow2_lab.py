@@ -9,6 +9,7 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
+from app.actions.destinations import BIS_LIMS_URL
 from app.core.entities import (
     Action,
     ClarificationRequest,
@@ -172,7 +173,7 @@ class Workflow2Lab(Workflow):
             # Zero eligible labs -> HANDOFF to BIS LIMS search
             action = Action(
                 action_type="search_lims",
-                destination_url="https://lims.bis.gov.in/search",
+                destination_url=BIS_LIMS_URL,
             )
             evidence = [
                 Evidence(

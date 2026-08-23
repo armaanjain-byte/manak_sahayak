@@ -12,6 +12,9 @@ BIS_CARE_APP_URL = "https://www.bis.gov.in/bis-apps/?lang=en"
 # Official BIS hallmarking overview / consumer guidance page
 BIS_HALLMARKING_INFO_URL = "https://www.bis.gov.in/hallmarking-overview/?lang=en"
 
+# Official BIS LIMS search (Laboratory Information Management System)
+BIS_LIMS_URL = "https://lims.bis.gov.in/search"
+
 # Official BIS Know Your Standard search
 BIS_KNOW_YOUR_STANDARD_URL = "https://www.bis.gov.in/know-your-standard/?lang=en"
 
