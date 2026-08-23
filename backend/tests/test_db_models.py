@@ -1,5 +1,5 @@
 import pytest
-from typing import List, Optional, Generator
+from typing import Generator
 from datetime import date, datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
