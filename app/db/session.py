@@ -1,8 +1,8 @@
 
-from sqlalchemy.orm import declarative_base
-from typing import Any
+from sqlalchemy.orm import DeclarativeBase
 
-Base: Any = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 def get_session() -> None:
     pass
