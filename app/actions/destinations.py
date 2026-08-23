@@ -14,3 +14,6 @@ BIS_HALLMARKING_INFO_URL = "https://www.bis.gov.in/hallmarking-overview/?lang=en
 
 # Official BIS Know Your Standard search
 BIS_KNOW_YOUR_STANDARD_URL = "https://www.bis.gov.in/know-your-standard/?lang=en"
+
+# Official BIS Main Site (fallback for unclassified queries)
+BIS_MAIN_URL = "https://www.bis.gov.in/?lang=en"
