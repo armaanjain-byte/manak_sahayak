@@ -1,6 +1,5 @@
 from typing import Optional, List
 from pydantic import BaseModel
-from app.core.states import ResponseState
 from enum import Enum
 
 class Confidence(str, Enum):
