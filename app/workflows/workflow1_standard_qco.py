@@ -111,7 +111,7 @@ class Workflow1StandardQCO(Workflow):
         of how many come back.
         """
         # A1 normalization flow - normalize term to CanonicalConcept
-        attributes = extract_attributes(query)
+        attributes = await extract_attributes(query)
         concept = lookup_concept(session, query)
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
@@ -170,7 +170,7 @@ class Workflow1StandardQCO(Workflow):
         Normal full-logic behavior when Gate A1 is ready.
         """
         # Step a/b: attributes extraction and normalization to concept
-        attributes = extract_attributes(query)
+        attributes = await extract_attributes(query)
         concept = lookup_concept(session, query)
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
