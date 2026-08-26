@@ -11,7 +11,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 
@@ -29,7 +29,7 @@ def load_metadata(data_dir: Path) -> dict[str, Any]:
         )
         return {}
     with meta_path.open(encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 def run_benchmark(data_dir: Path, output_file: Path) -> None:

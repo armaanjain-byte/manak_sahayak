@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch, AsyncMock
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -77,16 +78,31 @@ def test_no_match_returns_none(db_session: Session) -> None:
     assert lookup_concept(db_session, "") is None
     assert lookup_concept(db_session, "   ") is None
 
-def test_extract_attributes() -> None:
-    # For now, it returns a mock object with product_type set
-    query = "pressure cooker"
-    attrs = extract_attributes(query)
+@pytest.mark.asyncio
+@patch("app.generation.llm.LLMClient._generate", new_callable=AsyncMock)
+async def test_extract_attributes(mock_generate: AsyncMock) -> None:
+    # Set up mock response
+    mock_generate.return_value = '''
+    ```json
+    {
+        "product_type": "pressure cooker",
+        "material": "stainless steel",
+        "intended_use": "domestic",
+        "is_imported": false,
+        "technical_attributes": ["5 litre"]
+    }
+    ```
+    '''
+    query = "domestic stainless steel pressure cooker 5 litre"
+    attrs = await extract_attributes(query)
     
     assert attrs.product_type == "pressure cooker"
-    assert attrs.material is None
-    assert attrs.intended_use is None
-    assert attrs.is_imported is None
-    assert attrs.technical_attributes == []
+    assert attrs.material == "stainless steel"
+    assert attrs.intended_use == "domestic"
+    assert attrs.is_imported is False
+    assert attrs.technical_attributes is not None
+    assert "5 litre" in attrs.technical_attributes
+    mock_generate.assert_called_once()
 
 def test_filter_candidates() -> None:
     c1 = CanonicalConcept(name="pressure cooker", domain="kitchenware")

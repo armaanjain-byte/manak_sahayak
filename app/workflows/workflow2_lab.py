@@ -62,7 +62,7 @@ class Workflow2Lab(Workflow):
         Bounded fallback (PARTIAL behavior): candidate retrieval + clarification/abstention.
         Does not return a definitive lab recommendation answer (ANSWERED).
         """
-        attributes = extract_attributes(query)
+        attributes = await extract_attributes(query)
         concept = lookup_concept(session, query)
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
@@ -114,7 +114,7 @@ class Workflow2Lab(Workflow):
         """
         Normal full-logic behavior when Gate A2 is ready.
         """
-        attributes = extract_attributes(query)
+        attributes = await extract_attributes(query)
         concept = lookup_concept(session, query)
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
