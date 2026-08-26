@@ -100,6 +100,7 @@ async def test_extract_attributes(mock_generate: AsyncMock) -> None:
     assert attrs.material == "stainless steel"
     assert attrs.intended_use == "domestic"
     assert attrs.is_imported is False
+    assert attrs.technical_attributes is not None
     assert "5 litre" in attrs.technical_attributes
     mock_generate.assert_called_once()
 
