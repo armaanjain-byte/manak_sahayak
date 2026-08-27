@@ -38,9 +38,20 @@ class EvidenceItem(BaseModel):
     authoritative: bool
 
 
+class DecisionItem(BaseModel):
+    standard: str | None = None
+    mandatory: bool | None = None
+    basis: str | None = None
+    effective_from: str | None = None
+    pathway: str | None = None
+    confidence: str
+
+
 class QueryResponse(BaseModel):
     state: str
     explanation: str
+    decision: DecisionItem | None = None
+    confidence: str | None = None
     evidence: list[EvidenceItem] = []
     clarification_question: str | None = None
     clarification_options: list[str] | None = None
@@ -115,9 +126,24 @@ async def query(
         handoff_url = result.action.destination_url
         handoff_action_type = result.action.action_type
 
+    decision: DecisionItem | None = None
+    confidence: str | None = None
+    if result.decision:
+        decision = DecisionItem(
+            standard=result.decision.standard,
+            mandatory=result.decision.mandatory,
+            basis=result.decision.basis,
+            effective_from=result.decision.effective_from,
+            pathway=result.decision.pathway,
+            confidence=result.decision.confidence.value,
+        )
+        confidence = result.decision.confidence.value
+
     return QueryResponse(
         state=result.state.value,
         explanation=explanation,
+        decision=decision,
+        confidence=confidence,
         evidence=evidence,
         clarification_question=clarification_question,
         clarification_options=clarification_options,
