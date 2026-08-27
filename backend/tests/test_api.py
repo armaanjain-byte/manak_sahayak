@@ -122,7 +122,7 @@ def _conflict_result() -> WorkflowResult:
 @patch("app.api.routes_query.OrchestrationRouter")
 @patch("app.api.routes_query.build_response", new_callable=AsyncMock)
 def test_query_answered_shape(mock_build: AsyncMock, mock_orch_class: MagicMock, client: TestClient) -> None:
-    """ANSWERED: response has state, explanation, evidence list."""
+    """ANSWERED: response has state, explanation, decision, confidence, evidence."""
     mock_orch = AsyncMock()
     mock_orch.route.return_value = _answered_result()
     mock_orch_class.return_value = mock_orch
@@ -134,6 +134,15 @@ def test_query_answered_shape(mock_build: AsyncMock, mock_orch_class: MagicMock,
     body = resp.json()
     assert body["state"] == "ANSWERED"
     assert body["explanation"] == "IS 1234 is mandatory from 2023-01-01."
+    assert body["decision"] == {
+        "standard": "IS 1234",
+        "mandatory": True,
+        "basis": None,
+        "effective_from": "2023-01-01",
+        "pathway": None,
+        "confidence": "HIGH",
+    }
+    assert body["confidence"] == "HIGH"
     assert len(body["evidence"]) == 1
     assert body["evidence"][0]["source_id"] == "ev1"
     assert body["clarification_question"] is None
@@ -154,6 +163,8 @@ def test_query_clarification_shape(mock_build: AsyncMock, mock_orch_class: Magic
 
     body = resp.json()
     assert body["state"] == "CLARIFICATION"
+    assert body["decision"] is None
+    assert body["confidence"] is None
     assert body["clarification_question"] == "What type of product?"
     assert body["clarification_options"] == ["Toy", "Electrical"]
     assert body["handoff_url"] is None
@@ -173,6 +184,8 @@ def test_query_not_found_shape(mock_build: AsyncMock, mock_orch_class: MagicMock
 
     body = resp.json()
     assert body["state"] == "NOT_FOUND"
+    assert body["decision"] is None
+    assert body["confidence"] is None
     assert body["evidence"] == []
     assert body["handoff_url"] is None
 
@@ -191,6 +204,8 @@ def test_query_handoff_shape(mock_build: AsyncMock, mock_orch_class: MagicMock, 
 
     body = resp.json()
     assert body["state"] == "HANDOFF"
+    assert body["decision"] is None
+    assert body["confidence"] is None
     assert body["handoff_url"] == BIS_MAIN_URL
     assert body["handoff_action_type"] == "general_bis_handoff"
 
@@ -209,6 +224,8 @@ def test_query_conflict_shape(mock_build: AsyncMock, mock_orch_class: MagicMock,
 
     body = resp.json()
     assert body["state"] == "CONFLICT"
+    assert body["decision"] is None
+    assert body["confidence"] is None
     assert len(body["evidence"]) == 2
 
 
