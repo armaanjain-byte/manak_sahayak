@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.tests.benchmark.run_eval import run_benchmark
+from backend.tests.benchmark.run_eval import evaluate_record, run_benchmark
 
 
 @pytest.fixture
@@ -26,8 +26,15 @@ def dummy_benchmark_data(tmp_path: Path) -> Path:
         json.dump(meta, f)
         
     queries = [
-        # Pass (in-coverage)
-        {"query": "q1", "stratum": "in-coverage", "expected_state": "ANSWERED", "benchmark_version": "v1.0"},
+        {
+            "query": "q1",
+            "stratum": "in-coverage",
+            "expected_state": "ANSWERED",
+            "expected_standard": "IS 1234",
+            "expected_mandatory": True,
+            "min_authoritative_evidence": 1,
+            "benchmark_version": "v1.0",
+        },
         # Fail (in-coverage)
         {"query": "q2", "stratum": "in-coverage", "expected_state": "ANSWERED", "benchmark_version": "v1.0"},
         # Pass (out-of-coverage)
@@ -56,7 +63,26 @@ def test_run_benchmark_stratum_separation(mock_test_client_class: MagicMock, dum
         
         # q1: Pass
         if q == "q1":
-            mock_resp.json.return_value = {"state": "ANSWERED", "explanation": "Success"}
+            mock_resp.json.return_value = {
+                "state": "ANSWERED",
+                "explanation": "Success",
+                "decision": {
+                    "standard": "IS 1234",
+                    "mandatory": True,
+                    "basis": None,
+                    "effective_from": None,
+                    "pathway": None,
+                    "confidence": "HIGH",
+                },
+                "evidence": [
+                    {
+                        "source_id": "ev1",
+                        "source_type": "qco_gazette",
+                        "content": "Official evidence",
+                        "authoritative": True,
+                    }
+                ],
+            }
         # q2: Fail
         elif q == "q2":
             mock_resp.json.return_value = {"state": "NOT_FOUND", "explanation": "Fail"}
@@ -77,6 +103,8 @@ def test_run_benchmark_stratum_separation(mock_test_client_class: MagicMock, dum
         report = json.load(f)
         
     assert "metrics_by_stratum" in report
+    assert "metrics_by_task" in report
+    assert "failure_decomposition" in report
     metrics = report["metrics_by_stratum"]
     
     # In-coverage: 1 pass, 1 fail
@@ -92,3 +120,61 @@ def test_run_benchmark_stratum_separation(mock_test_client_class: MagicMock, dum
     # Failures list should contain q2
     assert len(report["failures"]) == 1
     assert report["failures"][0]["query"] == "q2"
+    assert report["failures"][0]["failure_type"] == "retrieval_or_routing_failure"
+
+
+def test_evaluate_record_uses_structured_decision_not_explanation() -> None:
+    """Expected standards are checked against the API decision object."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
+        "state": "ANSWERED",
+        "explanation": "The generated response omitted the standard identifier.",
+        "decision": {
+            "standard": "IS-1234",
+            "mandatory": True,
+            "basis": "QCO-TOYS",
+            "confidence": "HIGH",
+        },
+        "evidence": [{"authoritative": True}],
+    }
+
+    result = evaluate_record(
+        {
+            "expected_state": "ANSWERED",
+            "expected_standard": "IS 1234",
+            "expected_mandatory": True,
+            "expected_basis": "QCO TOYS",
+            "expected_confidence": "HIGH",
+            "min_authoritative_evidence": 1,
+        },
+        resp,
+    )
+
+    assert result["passed"] is True
+    assert result["checks"]["decision"] is True
+    assert result["checks"]["citation"] is True
+
+
+def test_evaluate_record_flags_forbidden_identifier() -> None:
+    """Adversarial records can guard against fabricated identifiers."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
+        "state": "NOT_FOUND",
+        "explanation": "No match found for IS 99999:2026.",
+        "decision": None,
+        "evidence": [],
+    }
+
+    result = evaluate_record(
+        {
+            "expected_state": "NOT_FOUND",
+            "forbidden_identifiers": ["IS 99999:2026"],
+        },
+        resp,
+    )
+
+    assert result["passed"] is False
+    assert result["checks"]["hallucination"] is False
+    assert result["failure_type"] == "generation_failure"
