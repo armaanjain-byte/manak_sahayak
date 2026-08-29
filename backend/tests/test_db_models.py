@@ -39,6 +39,8 @@ def test_standard_model_roundtrip(db_session: Session) -> None:
         title="Test Standard Title",
         scope="This standard covers testing of widgets.",
         status="ACTIVE",
+        revision="2021",
+        related_standards=["IS 4321:2020", "IS 5678:2019"],
         source_url="https://example.com/is1234",
         retrieved_at=now,
     )
@@ -51,6 +53,8 @@ def test_standard_model_roundtrip(db_session: Session) -> None:
     assert retrieved.title == "Test Standard Title"
     assert retrieved.scope == "This standard covers testing of widgets."
     assert retrieved.status == "ACTIVE"
+    assert retrieved.revision == "2021"
+    assert retrieved.related_standards == ["IS 4321:2020", "IS 5678:2019"]
     assert retrieved.source_url == "https://example.com/is1234"
     # Compare datetime within small delta due to DB resolution
     assert retrieved.retrieved_at is not None
@@ -59,6 +63,7 @@ def test_standard_model_roundtrip(db_session: Session) -> None:
 def test_qco_model_roundtrip(db_session: Session) -> None:
     now = datetime.now()
     pub_date = date(2026, 1, 1)
+    amendment_date = date(2026, 3, 1)
     eff_date = date(2026, 6, 1)
     qco = QCO(
         bis_entity_id="QCO-2026-001",
@@ -66,6 +71,7 @@ def test_qco_model_roundtrip(db_session: Session) -> None:
         product_category="Widgets",
         ministry="Ministry of Consumer Affairs",
         publication_date=pub_date,
+        amendment_date=amendment_date,
         effective_from=eff_date,
         mandatory=True,
         exemptions="Exempts micro-enterprises.",
@@ -81,6 +87,7 @@ def test_qco_model_roundtrip(db_session: Session) -> None:
     assert retrieved.product_category == "Widgets"
     assert retrieved.ministry == "Ministry of Consumer Affairs"
     assert retrieved.publication_date == pub_date
+    assert retrieved.amendment_date == amendment_date
     assert retrieved.effective_from == eff_date
     assert retrieved.mandatory is True
     assert retrieved.exemptions == "Exempts micro-enterprises."

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import List, Optional
-from sqlalchemy import String, Date, DateTime, Boolean, ForeignKey
+from sqlalchemy import JSON, String, Date, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
@@ -20,6 +20,8 @@ class Standard(Base):
     title: Mapped[str] = mapped_column(String)
     scope: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String)
+    revision: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    related_standards: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     source_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     retrieved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -40,6 +42,7 @@ class QCO(Base):
     product_category: Mapped[str] = mapped_column(String)
     ministry: Mapped[str] = mapped_column(String)
     publication_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    amendment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     effective_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     mandatory: Mapped[bool] = mapped_column(Boolean, default=True)
     exemptions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
