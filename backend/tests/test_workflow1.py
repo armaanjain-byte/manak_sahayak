@@ -5,6 +5,7 @@ All tests are fully offline and use in-memory SQLite and mocked retrieval.
 """
 from datetime import date
 from typing import Generator, List, Optional
+from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -265,6 +266,37 @@ async def test_workflow1_clean_single_match(db_session: Session) -> None:
     assert result.evidence[0].authoritative is True
     assert result.evidence[1].source_type == "qco"
     assert result.evidence[1].authoritative is True
+
+
+@pytest.mark.asyncio
+@patch("app.workflows.workflow1_standard_qco.extract_attributes", new_callable=AsyncMock)
+async def test_workflow1_normalizes_extracted_product_type(
+    mock_extract: AsyncMock,
+    db_session: Session,
+) -> None:
+    _set_gate_ready(True)
+    mock_extract.return_value.product_type = "pressure cooker"
+
+    concept = _seed_concept(db_session, "pressure cooker", "Kitchenware")
+    std = _seed_standard(db_session, "IS 2347:2017", "Domestic Pressure Cookers")
+    _seed_mapping(db_session, concept, std)
+
+    chunks = [
+        RagflowChunk(
+            bis_entity_id=std.bis_entity_id,
+            title=std.title,
+            snippet="",
+            similarity=0.99,
+        )
+    ]
+    mock_client = MockRagflowClient(chunks=chunks)
+    workflow = Workflow1StandardQCO(session=db_session, ragflow_client=mock_client)
+
+    result = await workflow.run("Do I need BIS certification for my pressure cooker?")
+
+    assert result.state == ResponseState.ANSWERED
+    assert result.decision is not None
+    assert result.decision.standard == "IS 2347:2017"
 
 
 @pytest.mark.asyncio

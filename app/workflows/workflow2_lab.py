@@ -28,6 +28,10 @@ from app.retrieval.structured import fetch_standard
 from app.workflows.base import Workflow, WorkflowResult
 
 
+def _normalization_term(query: str, product_type: str | None) -> str:
+    return (product_type or "").strip() or query
+
+
 class Workflow2Lab(Workflow):
     def __init__(
         self,
@@ -63,7 +67,7 @@ class Workflow2Lab(Workflow):
         Does not return a definitive lab recommendation answer (ANSWERED).
         """
         attributes = await extract_attributes(query)
-        concept = lookup_concept(session, query)
+        concept = lookup_concept(session, _normalization_term(query, attributes.product_type))
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
 
@@ -115,7 +119,7 @@ class Workflow2Lab(Workflow):
         Normal full-logic behavior when Gate A2 is ready.
         """
         attributes = await extract_attributes(query)
-        concept = lookup_concept(session, query)
+        concept = lookup_concept(session, _normalization_term(query, attributes.product_type))
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
 

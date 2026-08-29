@@ -27,6 +27,10 @@ from app.retrieval.candidate_ranking import rank_candidates
 from app.retrieval.structured import fetch_standard
 
 
+def _normalization_term(query: str, product_type: str | None) -> str:
+    return (product_type or "").strip() or query
+
+
 class Workflow1StandardQCO(Workflow):
     """
     Workflow 1 resolves a query for a product into standard, QCO, mandatory
@@ -112,7 +116,7 @@ class Workflow1StandardQCO(Workflow):
         """
         # A1 normalization flow - normalize term to CanonicalConcept
         attributes = await extract_attributes(query)
-        concept = lookup_concept(session, query)
+        concept = lookup_concept(session, _normalization_term(query, attributes.product_type))
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
 
@@ -171,7 +175,7 @@ class Workflow1StandardQCO(Workflow):
         """
         # Step a/b: attributes extraction and normalization to concept
         attributes = await extract_attributes(query)
-        concept = lookup_concept(session, query)
+        concept = lookup_concept(session, _normalization_term(query, attributes.product_type))
         if concept is None:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
 

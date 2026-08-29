@@ -4,6 +4,7 @@ Tests for Workflow 2 (Standard -> Laboratory).
 import pytest
 from datetime import date, timedelta
 from typing import Generator, Any
+from unittest.mock import AsyncMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -185,6 +186,49 @@ async def test_workflow2_expired_lab_excluded(db_session: Session) -> None:
     assert "Valid Lab" in lab_evidences[0].content
     assert "Expired Lab" not in str(lab_evidences)
     assert "Unrecognized Lab" not in str(lab_evidences)
+
+
+@pytest.mark.asyncio
+@patch("app.workflows.workflow2_lab.extract_attributes", new_callable=AsyncMock)
+async def test_workflow2_normalizes_extracted_product_type(
+    mock_extract: AsyncMock,
+    db_session: Session,
+) -> None:
+    _set_gate_ready(True)
+    mock_extract.return_value.product_type = "drinking water"
+
+    concept = _seed_concept(db_session, "drinking water", "Food")
+    std = _seed_standard(db_session, "IS 10500:2012", "Drinking Water")
+    _seed_mapping(db_session, concept, std)
+
+    lab = Laboratory(
+        bis_entity_id="LAB-WATER",
+        name="Water Lab",
+        recognition_status="RECOGNIZED",
+        scope="Testing as per IS 10500:2012",
+        validity=date.today() + timedelta(days=30),
+        location="Delhi",
+    )
+    db_session.add(lab)
+    db_session.commit()
+
+    chunks = [
+        RagflowChunk(
+            bis_entity_id=std.bis_entity_id,
+            title=std.title,
+            snippet="",
+            similarity=0.95,
+        )
+    ]
+    mock_client = MockRagflowClient(chunks=chunks)
+    workflow = Workflow2Lab(session=db_session, ragflow_client=mock_client)  # type: ignore[arg-type]
+
+    result = await workflow.run("Find a BIS lab for drinking water testing")
+
+    assert result.state == ResponseState.ANSWERED
+    assert result.decision is not None
+    assert result.decision.standard == "IS 10500:2012"
+    assert any("Water Lab" in evidence.content for evidence in result.evidence)
 
 
 @pytest.mark.asyncio
