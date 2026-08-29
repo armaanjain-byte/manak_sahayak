@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.actions.router import UnknownDestinationError, resolve_action
 from app.db.session import get_db
 from app.generation.response_builder import build_response
 from app.orchestration.router import OrchestrationRouter
@@ -57,6 +58,7 @@ class QueryResponse(BaseModel):
     clarification_options: list[str] | None = None
     handoff_url: str | None = None
     handoff_action_type: str | None = None
+    handoff_disclaimer: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -122,9 +124,17 @@ async def query(
 
     handoff_url: str | None = None
     handoff_action_type: str | None = None
+    handoff_disclaimer: str | None = None
     if result.action:
-        handoff_url = result.action.destination_url
-        handoff_action_type = result.action.action_type
+        try:
+            resolved_action = resolve_action(result.action)
+        except UnknownDestinationError as exc:
+            logger.error("Unsafe action destination: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal action routing error") from exc
+
+        handoff_url = resolved_action.destination_url
+        handoff_action_type = resolved_action.action_type
+        handoff_disclaimer = resolved_action.disclaimer
 
     decision: DecisionItem | None = None
     confidence: str | None = None
@@ -149,4 +159,5 @@ async def query(
         clarification_options=clarification_options,
         handoff_url=handoff_url,
         handoff_action_type=handoff_action_type,
+        handoff_disclaimer=handoff_disclaimer,
     )

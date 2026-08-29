@@ -105,6 +105,16 @@ def _handoff_result() -> WorkflowResult:
     )
 
 
+def _unsafe_handoff_result() -> WorkflowResult:
+    return WorkflowResult(
+        state=ResponseState.HANDOFF,
+        action=Action(
+            action_type="general_bis_handoff",
+            destination_url="https://unapproved.example.com/",
+        ),
+    )
+
+
 def _conflict_result() -> WorkflowResult:
     return WorkflowResult(
         state=ResponseState.CONFLICT,
@@ -208,6 +218,7 @@ def test_query_handoff_shape(mock_build: AsyncMock, mock_orch_class: MagicMock, 
     assert body["confidence"] is None
     assert body["handoff_url"] == BIS_MAIN_URL
     assert body["handoff_action_type"] == "general_bis_handoff"
+    assert "official Bureau of Indian Standards" in body["handoff_disclaimer"]
 
 
 @patch("app.api.routes_query.OrchestrationRouter")
@@ -264,6 +275,25 @@ def test_query_orchestration_error_500(mock_orch_class: MagicMock, client: TestC
     # Must not leak internals
     assert "DB connection failed" not in body["detail"]
     assert "Internal" in body["detail"]
+
+
+@patch("app.api.routes_query.OrchestrationRouter")
+@patch("app.api.routes_query.build_response", new_callable=AsyncMock)
+def test_query_rejects_unknown_handoff_destination(
+    mock_build: AsyncMock,
+    mock_orch_class: MagicMock,
+    client: TestClient,
+) -> None:
+    """HANDOFF actions must use a known official destination."""
+    mock_orch = AsyncMock()
+    mock_orch.route.return_value = _unsafe_handoff_result()
+    mock_orch_class.return_value = mock_orch
+    mock_build.return_value = "Handing off."
+
+    resp = client.post("/query", json={"query": "send me somewhere"})
+
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == "Internal action routing error"
 
 
 # ---------------------------------------------------------------------------
