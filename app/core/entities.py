@@ -15,6 +15,7 @@ class DecisionObject(BaseModel):
     effective_from: Optional[str] = None
     pathway: Optional[str] = None
     confidence: Confidence = Confidence.INSUFFICIENT
+    evidence_ids: Optional[List[str]] = None
 
 class Evidence(BaseModel):
     source_id: str

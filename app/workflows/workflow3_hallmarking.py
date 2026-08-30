@@ -75,25 +75,43 @@ _VERIFICATION_KEYWORDS = [
 ]
 
 
-def _classify_intent(query: str) -> HallmarkingIntent:
+async def _classify_intent(query: str) -> HallmarkingIntent:
     """
-    Lightweight keyword-based intent classifier.
-
-    Checked in this order: VERIFICATION first (takes precedence over
-    INFORMATIONAL when both keywords could match), then INFORMATIONAL,
-    then OUT_OF_SCOPE.
+    LLM-based intent classifier for Hallmarking queries.
     """
-    q = query.lower()
-
-    for kw in _VERIFICATION_KEYWORDS:
-        if kw in q:
+    from app.generation.llm import LLMClient
+    
+    client = LLMClient()
+    prompt = (
+        "Classify the following query into exactly one of these categories:\n"
+        "- VERIFICATION: The user wants to check, verify, or validate a HUID or hallmark.\n"
+        "- INFORMATIONAL: The user wants to know what a HUID or hallmark is, or what it indicates.\n"
+        "- OUT_OF_SCOPE: Anything else.\n\n"
+        f"Query: {query}\n\n"
+        "Reply ONLY with the category name."
+    )
+    try:
+        response_text = await client._generate(
+            system="You are an intent classifier for hallmarking queries. Respond ONLY with the category name.",
+            user=prompt
+        )
+        clean_text = response_text.strip().upper()
+        if "VERIFICATION" in clean_text:
             return HallmarkingIntent.VERIFICATION
-
-    for kw in _INFORMATIONAL_KEYWORDS:
-        if kw in q:
+        elif "INFORMATIONAL" in clean_text:
             return HallmarkingIntent.INFORMATIONAL
-
-    return HallmarkingIntent.OUT_OF_SCOPE
+        else:
+            return HallmarkingIntent.OUT_OF_SCOPE
+    except Exception:
+        # Fallback to simple keyword check if LLM fails
+        q = query.lower()
+        for kw in _VERIFICATION_KEYWORDS:
+            if kw in q:
+                return HallmarkingIntent.VERIFICATION
+        for kw in _INFORMATIONAL_KEYWORDS:
+            if kw in q:
+                return HallmarkingIntent.INFORMATIONAL
+        return HallmarkingIntent.OUT_OF_SCOPE
 
 
 # ---------------------------------------------------------------------------
@@ -124,21 +142,21 @@ class Workflow3Hallmarking(Workflow):
         gate_passed = is_ready("workflow_3")
 
         if not gate_passed:
-            return self._run_fallback(query)
+            return await self._run_fallback(query)
 
-        return self._run_full(query)
+        return await self._run_full(query)
 
     # ------------------------------------------------------------------
     # Fallback — gate not ready
     # ------------------------------------------------------------------
 
-    def _run_fallback(self, query: str) -> WorkflowResult:
+    async def _run_fallback(self, query: str) -> WorkflowResult:
         """
         Gate A3 not yet ready.  Return CLARIFICATION for recognised hallmarking
         intents, NOT_FOUND for queries clearly outside the bounded scope.
         Never return ANSWERED here.
         """
-        intent = _classify_intent(query)
+        intent = await _classify_intent(query)
 
         if intent == HallmarkingIntent.OUT_OF_SCOPE:
             return WorkflowResult(state=ResponseState.NOT_FOUND)
@@ -167,8 +185,8 @@ class Workflow3Hallmarking(Workflow):
     # Full path — gate ready
     # ------------------------------------------------------------------
 
-    def _run_full(self, query: str) -> WorkflowResult:
-        intent = _classify_intent(query)
+    async def _run_full(self, query: str) -> WorkflowResult:
+        intent = await _classify_intent(query)
 
         if intent == HallmarkingIntent.INFORMATIONAL:
             return self._handle_informational(query)
@@ -189,12 +207,20 @@ class Workflow3Hallmarking(Workflow):
         The decision object carries the explanation; evidence is sourced from
         at least one authoritative structured record — never an LLM-only answer.
         """
-        # Fetch authoritative hallmarking records as structural evidence.
-        # We use the first available records rather than query-specific matching
-        # because informational HUID queries are general in nature.
-        records: list[HallmarkingRecord] = (
-            self.session.query(HallmarkingRecord).limit(5).all()
-        )
+        from sqlalchemy import func
+        
+        # Issue 17: Filter hallmarking informational records by metal type
+        metal_hint = None
+        if "gold" in query.lower() or "sone" in query.lower() or "sona" in query.lower():
+            metal_hint = "gold"
+        elif "silver" in query.lower() or "chandi" in query.lower():
+            metal_hint = "silver"
+
+        q = self.session.query(HallmarkingRecord)
+        if metal_hint:
+            q = q.filter(func.lower(HallmarkingRecord.metal) == metal_hint)
+            
+        records: list[HallmarkingRecord] = q.limit(5).all()
 
         if not records:
             # No structured records available — cannot satisfy the evidence

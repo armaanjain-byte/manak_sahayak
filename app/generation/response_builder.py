@@ -34,9 +34,21 @@ async def build_response(result: WorkflowResult) -> str:
         return "I could not find a relevant standard or regulatory requirement for your query in the current BIS records."
         
     elif result.state == ResponseState.CONFLICT:
-        return "I found conflicting evidence regarding your query and cannot provide a definitive answer."
+        source_names = [e.source_id for e in (result.evidence or [])]
+        sources_str = ", ".join(source_names) if source_names else "multiple sources"
+        return (
+            f"Conflicting evidence was found in {sources_str}. "
+            "A definitive answer cannot be provided. Please consult the official BIS portal."
+        )
         
     elif result.state == ResponseState.HANDOFF:
-        return "I am handing you off to the official BIS service for further action."
+        if result.action:
+            from app.actions.router import resolve_action
+            resolved = resolve_action(result.action)
+            return (
+                f"For this query, please visit the official {resolved.destination_name}. "
+                f"{resolved.disclaimer} Link: {resolved.destination_url}"
+            )
+        return "Please visit the official BIS portal for assistance."
         
     return "An unknown error occurred."

@@ -70,7 +70,7 @@ def _seed_standard(session: Session, is_number: str, title: str) -> Standard:
         bis_entity_id=is_number.replace(" ", "-"),
         is_number=is_number,
         title=title,
-        scope=f"Scope of {is_number}",
+        scope=f"{title} - Scope of {is_number}",
         status="ACTIVE",
     )
     session.add(std)

@@ -269,4 +269,4 @@ async def test_response_builder_handoff() -> None:
         action=Action(action_type="huid_verification", destination_url=BIS_CARE_APP_URL)
     )
     text = await build_response(result_obj)
-    assert "handoff" in text.lower() or "redirecting" in text.lower() or "handing" in text.lower()
+    assert "official" in text.lower() or "visit" in text.lower()

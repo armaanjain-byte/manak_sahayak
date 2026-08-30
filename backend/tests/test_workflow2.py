@@ -160,6 +160,7 @@ async def test_workflow2_expired_lab_excluded(db_session: Session) -> None:
         validity=date.today() + timedelta(days=30),
         location="Chennai",
     )
+    std.laboratories.extend([lab1, lab2, lab3])
     db_session.add_all([lab1, lab2, lab3])
     db_session.commit()
 
@@ -209,6 +210,7 @@ async def test_workflow2_normalizes_extracted_product_type(
         validity=date.today() + timedelta(days=30),
         location="Delhi",
     )
+    std.laboratories.append(lab)
     db_session.add(lab)
     db_session.commit()
 
@@ -248,6 +250,7 @@ async def test_workflow2_zero_eligible_labs(db_session: Session) -> None:
         validity=date.today() - timedelta(days=10),
         location="Pune",
     )
+    std.laboratories.append(lab_expired)
     db_session.add(lab_expired)
     db_session.commit()
 
@@ -295,6 +298,7 @@ async def test_workflow2_multiple_valid_labs(db_session: Session) -> None:
         validity=date.today() + timedelta(days=200),
         location="Bhilai",
     )
+    std.laboratories.extend([lab_a, lab_b])
     db_session.add_all([lab_a, lab_b])
     db_session.commit()
 
