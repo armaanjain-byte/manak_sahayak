@@ -28,8 +28,10 @@ router = APIRouter()
 # Request / Response schemas
 # ---------------------------------------------------------------------------
 
+from pydantic import BaseModel, Field
+
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(..., max_length=2000)
 
 
 class EvidenceItem(BaseModel):

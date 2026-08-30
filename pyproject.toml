@@ -26,4 +26,4 @@ dependencies = [
 strict = true
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "backend"]

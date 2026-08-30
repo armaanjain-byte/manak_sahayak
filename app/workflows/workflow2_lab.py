@@ -158,10 +158,8 @@ class Workflow2Lab(Workflow):
         target_std = resolved_standards[0]
 
         # Fetch laboratories matching this standard's scope
-        # Using LIKE as no join table is available
-        all_labs = session.query(Laboratory).filter(
-            Laboratory.scope.like(f"%{target_std.is_number}%")
-        ).all()
+        # Using the LaboratoryScope join table relation
+        all_labs = target_std.laboratories
 
         eligible_labs = []
         today = date.today()

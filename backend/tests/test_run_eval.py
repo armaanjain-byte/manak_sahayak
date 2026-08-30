@@ -50,13 +50,13 @@ def dummy_benchmark_data(tmp_path: Path) -> Path:
     return data_dir
 
 
-@patch("backend.tests.benchmark.run_eval.TestClient")
-def test_run_benchmark_stratum_separation(mock_test_client_class: MagicMock, dummy_benchmark_data: Path, tmp_path: Path) -> None:
+@patch("backend.tests.benchmark.run_eval.httpx.AsyncClient")
+def test_run_benchmark_stratum_separation(mock_async_client_class: MagicMock, dummy_benchmark_data: Path, tmp_path: Path) -> None:
     """Verify that run_benchmark groups metrics by stratum and doesn't blend them."""
     mock_client = MagicMock()
-    mock_test_client_class.return_value = mock_client
+    mock_async_client_class.return_value.__aenter__.return_value = mock_client
     
-    def fake_post(url: str, json: dict[str, str]) -> MagicMock:
+    async def fake_post(url: str, json: dict[str, str]) -> MagicMock:
         q = json.get("query")
         mock_resp = MagicMock()
         mock_resp.status_code = 200

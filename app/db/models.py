@@ -11,6 +11,14 @@ class QCOStandardMapping(Base):
     qco_bis_entity_id: Mapped[str] = mapped_column(ForeignKey("qcos.bis_entity_id", ondelete="CASCADE"))
     standard_bis_entity_id: Mapped[str] = mapped_column(ForeignKey("standards.bis_entity_id", ondelete="CASCADE"))
 
+class LaboratoryScope(Base):
+    __tablename__ = "laboratory_scopes"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    laboratory_id: Mapped[int] = mapped_column(ForeignKey("laboratories.id", ondelete="CASCADE"))
+    standard_id: Mapped[int] = mapped_column(ForeignKey("standards.id", ondelete="CASCADE"))
+
+
 class Standard(Base):
     __tablename__ = "standards"
     
@@ -30,6 +38,10 @@ class Standard(Base):
         secondary="qco_standard_mappings",
         primaryjoin="Standard.bis_entity_id == QCOStandardMapping.standard_bis_entity_id",
         secondaryjoin="QCO.bis_entity_id == QCOStandardMapping.qco_bis_entity_id",
+        back_populates="standards"
+    )
+    laboratories: Mapped[List["Laboratory"]] = relationship(
+        secondary="laboratory_scopes",
         back_populates="standards"
     )
 
@@ -70,6 +82,12 @@ class Laboratory(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     retrieved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
+    # Relationships
+    standards: Mapped[List["Standard"]] = relationship(
+        secondary="laboratory_scopes",
+        back_populates="laboratories"
+    )
+
 class HallmarkingRecord(Base):
     __tablename__ = "hallmarking_records"
     
@@ -86,7 +104,7 @@ class CanonicalConcept(Base):
     __tablename__ = "canonical_concepts"
     
     id: Mapped[int] = mapped_column(primary_key=True)
-    bis_entity_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    bis_entity_id: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     domain: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 

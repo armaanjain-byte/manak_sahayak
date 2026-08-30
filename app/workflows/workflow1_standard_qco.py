@@ -202,6 +202,11 @@ class Workflow1StandardQCO(Workflow):
         for chunk in candidate_chunks:
             std = fetch_standard(session, chunk.bis_entity_id)
             if std:
+                # Issue 22: Scope applicability check
+                scope_lower = (std.scope or "").lower()
+                prod_type = (attributes.product_type or "").lower()
+                if prod_type and prod_type not in scope_lower:
+                    continue  # Skip if product type is not in scope
                 resolved_standards.append(std)
 
         if not resolved_standards:
@@ -223,9 +228,18 @@ class Workflow1StandardQCO(Workflow):
         target_std = resolved_standards[0]
         qcos = target_std.qcos
 
-        # Step g: If evidence conflicts (different QCO mandatory statuses), return CONFLICT
+        # Step g: Resolve conflicts (Issue 24/19 - effective_date precedence)
         if len(qcos) >= 2:
-            mandatory_statuses = {q.mandatory for q in qcos}
+            from datetime import date
+            today = date.today()
+            
+            # Filter to applicable QCOs
+            applicable_qcos = [q for q in qcos if not q.effective_from or q.effective_from <= today]
+            if not applicable_qcos:
+                # If none are applicable yet, fall back to all
+                applicable_qcos = qcos
+                
+            mandatory_statuses = {q.mandatory for q in applicable_qcos}
             if len(mandatory_statuses) > 1:
                 evidence = [
                     Evidence(
@@ -234,12 +248,14 @@ class Workflow1StandardQCO(Workflow):
                         content=f"QCO {q.qco_identifier}: mandatory={q.mandatory}",
                         authoritative=True,
                     )
-                    for q in qcos
+                    for q in applicable_qcos
                 ]
                 return WorkflowResult(
                     state=ResponseState.CONFLICT,
                     evidence=evidence,
                 )
+            # If resolved by effective date, proceed with the applicable one
+            qcos = applicable_qcos
 
         # Normal single match case -> ANSWERED
         qco = qcos[0] if qcos else None
@@ -274,6 +290,16 @@ class Workflow1StandardQCO(Workflow):
                     authoritative=True,
                 )
             )
+            # Issue 23: QCO exemptions
+            if qco.exemptions:
+                evidence.append(
+                    Evidence(
+                        source_id=qco.bis_entity_id,
+                        source_type="qco_exemption",
+                        content=f"QCO exemption clause: {qco.exemptions}",
+                        authoritative=True,
+                    )
+                )
 
         return WorkflowResult(
             state=ResponseState.ANSWERED,

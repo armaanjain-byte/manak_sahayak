@@ -10,8 +10,6 @@ from app.config import get_settings
 class Base(DeclarativeBase):
     pass
 
-def get_session() -> None:
-    pass
 
 _engine: Engine | None = None
 

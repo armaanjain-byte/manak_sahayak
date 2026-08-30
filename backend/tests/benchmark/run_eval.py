@@ -14,7 +14,9 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-from fastapi.testclient import TestClient
+import asyncio
+import httpx
+from httpx import ASGITransport
 
 from app.main import app
 
@@ -111,6 +113,8 @@ def evaluate_record(record: dict[str, Any], resp: Any) -> dict[str, Any]:
     evidence = body.get("evidence") or []
 
     state_match = actual_status_code == 200 and body.get("state") == expected_state
+    
+    # Issue 17 / 26: check structured standard rather than string search
     standard_match = _identifier_match(decision.get("standard"), expected_standard)
     basis_match = _identifier_match(decision.get("basis"), expected_basis)
     mandatory_match = expected_mandatory is None or decision.get("mandatory") == expected_mandatory
@@ -171,114 +175,121 @@ def run_benchmark(data_dir: Path, output_file: Path) -> None:
         logger.error(f"Benchmark file {queries_path} not found.")
         sys.exit(1)
 
-    # Initialize TestClient to hit the real app routes (POST /query)
-    client = TestClient(app)
+    # Use ASGITransport to test FastAPI properly without ThreadPool errors
+    transport = ASGITransport(app=app)
+    
+    async def _run() -> tuple[dict[str, Any], dict[str, dict[str, int]]]:
+        results_by_stratum: dict[str, dict[str, int]] = {}
+        metrics_by_task: dict[str, dict[str, int]] = {
+            "state_accuracy": _new_metric_bucket(),
+            "decision_correctness": _new_metric_bucket(),
+            "citation_completeness": _new_metric_bucket(),
+            "official_handoff": _new_metric_bucket(),
+            "hallucination_guard": _new_metric_bucket(),
+        }
+        failure_decomposition: dict[str, int] = {}
+        failed_queries: list[dict[str, Any]] = []
+        
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            total = 0
+            passed = 0
+            
+            with queries_path.open(encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+        
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        logger.error("Line %d is invalid JSON: %s", line_num, e)
+                        continue
+        
+                    q_version = record.get("benchmark_version")
+                    if frozen_version and q_version != frozen_version:
+                        logger.warning(
+                            "CRITICAL WARNING: Query on line %d has version '%s', "
+                            "but frozen metadata expects '%s'. The benchmark has been mutated!",
+                            line_num,
+                            q_version,
+                            frozen_version,
+                        )
+        
+                    query_text = record.get("query", "")
+                    stratum = record.get("stratum", "unknown")
+        
+                    if stratum not in results_by_stratum:
+                        results_by_stratum[stratum] = _new_metric_bucket()
+        
+                    results_by_stratum[stratum]["total"] += 1
+                    total += 1
+        
+                    # Execute query through orchestration
+                    resp = await client.post("/query", json={"query": query_text})
+                    evaluation = evaluate_record(record, resp)
+        
+                    _update_metric(metrics_by_task["state_accuracy"], evaluation["checks"]["state"])
+                    if evaluation["applicable_checks"]["decision"]:
+                        _update_metric(metrics_by_task["decision_correctness"], evaluation["checks"]["decision"])
+                    if evaluation["applicable_checks"]["citation"]:
+                        _update_metric(metrics_by_task["citation_completeness"], evaluation["checks"]["citation"])
+                    if evaluation["applicable_checks"]["handoff"]:
+                        _update_metric(metrics_by_task["official_handoff"], evaluation["checks"]["handoff"])
+                    if evaluation["applicable_checks"]["hallucination"]:
+                        _update_metric(metrics_by_task["hallucination_guard"], evaluation["checks"]["hallucination"])
+        
+                    if evaluation["passed"]:
+                        results_by_stratum[stratum]["pass"] += 1
+                        passed += 1
+                    else:
+                        results_by_stratum[stratum]["fail"] += 1
+                        failure_type = evaluation["failure_type"] or "unknown_failure"
+                        failure_decomposition[failure_type] = failure_decomposition.get(failure_type, 0) + 1
+                        failed_queries.append({
+                            "query": query_text,
+                            "stratum": stratum,
+                            "expected": {
+                                "state": record.get("expected_state"),
+                                "standard": record.get("expected_standard"),
+                                "mandatory": record.get("expected_mandatory"),
+                                "basis": record.get("expected_basis"),
+                                "confidence": record.get("expected_confidence"),
+                                "handoff_action_type": record.get("expected_handoff_action_type"),
+                                "min_authoritative_evidence": record.get("min_authoritative_evidence", 0),
+                            },
+                            "actual": {
+                                "status_code": evaluation["actual_status_code"],
+                                "state": evaluation["actual_state"],
+                                "decision": evaluation["actual_decision"],
+                                "handoff_action_type": evaluation["actual_handoff_action_type"],
+                                "authoritative_evidence_count": evaluation["authoritative_evidence_count"],
+                                "explanation": evaluation["explanation"],
+                            },
+                            "checks": evaluation["checks"],
+                            "applicable_checks": evaluation["applicable_checks"],
+                            "failure_type": failure_type,
+                        })
+            
+            report = {
+                "metadata": metadata,
+                "summary": {
+                    "total_queries": total,
+                    "total_passed": passed,
+                    "overall_accuracy_warning": "DO NOT USE BLENDED ACCURACY. SEE PER-STRATUM METRICS."
+                },
+                "metrics_by_stratum": results_by_stratum,
+                "metrics_by_task": metrics_by_task,
+                "failure_decomposition": failure_decomposition,
+                "failures": failed_queries
+            }
+        
+            with output_file.open("w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2)
+                
+            return report, results_by_stratum
 
-    results_by_stratum: dict[str, dict[str, int]] = {}
-    metrics_by_task: dict[str, dict[str, int]] = {
-        "state_accuracy": _new_metric_bucket(),
-        "decision_correctness": _new_metric_bucket(),
-        "citation_completeness": _new_metric_bucket(),
-        "official_handoff": _new_metric_bucket(),
-        "hallucination_guard": _new_metric_bucket(),
-    }
-    failure_decomposition: dict[str, int] = {}
-    failed_queries: list[dict[str, Any]] = []
-    total = 0
-    passed = 0
-
-    with queries_path.open(encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as e:
-                logger.error("Line %d is invalid JSON: %s", line_num, e)
-                continue
-
-            q_version = record.get("benchmark_version")
-            if frozen_version and q_version != frozen_version:
-                logger.warning(
-                    "CRITICAL WARNING: Query on line %d has version '%s', "
-                    "but frozen metadata expects '%s'. The benchmark has been mutated!",
-                    line_num,
-                    q_version,
-                    frozen_version,
-                )
-
-            query_text = record.get("query", "")
-            stratum = record.get("stratum", "unknown")
-
-            if stratum not in results_by_stratum:
-                results_by_stratum[stratum] = _new_metric_bucket()
-
-            results_by_stratum[stratum]["total"] += 1
-            total += 1
-
-            # Execute query through orchestration
-            resp = client.post("/query", json={"query": query_text})
-            evaluation = evaluate_record(record, resp)
-
-            _update_metric(metrics_by_task["state_accuracy"], evaluation["checks"]["state"])
-            if evaluation["applicable_checks"]["decision"]:
-                _update_metric(metrics_by_task["decision_correctness"], evaluation["checks"]["decision"])
-            if evaluation["applicable_checks"]["citation"]:
-                _update_metric(metrics_by_task["citation_completeness"], evaluation["checks"]["citation"])
-            if evaluation["applicable_checks"]["handoff"]:
-                _update_metric(metrics_by_task["official_handoff"], evaluation["checks"]["handoff"])
-            if evaluation["applicable_checks"]["hallucination"]:
-                _update_metric(metrics_by_task["hallucination_guard"], evaluation["checks"]["hallucination"])
-
-            if evaluation["passed"]:
-                results_by_stratum[stratum]["pass"] += 1
-                passed += 1
-            else:
-                results_by_stratum[stratum]["fail"] += 1
-                failure_type = evaluation["failure_type"] or "unknown_failure"
-                failure_decomposition[failure_type] = failure_decomposition.get(failure_type, 0) + 1
-                failed_queries.append({
-                    "query": query_text,
-                    "stratum": stratum,
-                    "expected": {
-                        "state": record.get("expected_state"),
-                        "standard": record.get("expected_standard"),
-                        "mandatory": record.get("expected_mandatory"),
-                        "basis": record.get("expected_basis"),
-                        "confidence": record.get("expected_confidence"),
-                        "handoff_action_type": record.get("expected_handoff_action_type"),
-                        "min_authoritative_evidence": record.get("min_authoritative_evidence", 0),
-                    },
-                    "actual": {
-                        "status_code": evaluation["actual_status_code"],
-                        "state": evaluation["actual_state"],
-                        "decision": evaluation["actual_decision"],
-                        "handoff_action_type": evaluation["actual_handoff_action_type"],
-                        "authoritative_evidence_count": evaluation["authoritative_evidence_count"],
-                        "explanation": evaluation["explanation"],
-                    },
-                    "checks": evaluation["checks"],
-                    "applicable_checks": evaluation["applicable_checks"],
-                    "failure_type": failure_type,
-                })
-
-    report = {
-        "metadata": metadata,
-        "summary": {
-            "total_queries": total,
-            "total_passed": passed,
-            "overall_accuracy_warning": "DO NOT USE BLENDED ACCURACY. SEE PER-STRATUM METRICS."
-        },
-        "metrics_by_stratum": results_by_stratum,
-        "metrics_by_task": metrics_by_task,
-        "failure_decomposition": failure_decomposition,
-        "failures": failed_queries
-    }
-
-    with output_file.open("w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
+    report, results_by_stratum = asyncio.run(_run())
 
     logger.info("Evaluation complete. Report written to %s", output_file)
     logger.info("Stratum breakdown:")

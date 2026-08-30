@@ -10,6 +10,7 @@ class WorkflowResult(BaseModel):
     evidence: List[Evidence] = []
     clarification: Optional[ClarificationRequest] = None
     action: Optional[Action] = None
+    query: Optional[str] = None
 
     @model_validator(mode="after")
     def check_invariants(self) -> "WorkflowResult":
